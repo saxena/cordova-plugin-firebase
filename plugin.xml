@@ -60,6 +60,10 @@ xmlns:android="http://schemas.android.com/apk/res/android">
 			</feature>
 		</config-file>
 
+    <config-file target="*-Info.plist" parent="/plist/dict">
+      <key>FirebaseAppDelegateProxyEnabled</key><true/>
+    </config-file>
+
 		<resource-file src="src/ios/GoogleService-Info.plist" target="Resources/GoogleService-Info.plist" />
 
 		<header-file src="src/ios/FirebasePlugin.h" />
