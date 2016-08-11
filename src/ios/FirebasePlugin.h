@@ -9,4 +9,5 @@
 - (void)subscribe:(CDVInvokedUrlCommand*)command;
 - (void)unsubscribe:(CDVInvokedUrlCommand*)command;
 - (void)logEvent:(CDVInvokedUrlCommand*)command;
+- (void)setUserProperty:(CDVInvokedUrlCommand*)command;
 @end

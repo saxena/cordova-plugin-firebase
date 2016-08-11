@@ -32,6 +32,10 @@ exports.logEvent = function(name, params, success, error) {
     exec(success, error, "FirebasePlugin", "logEvent", [name, params]);
 };
 
+exports.setUserProperty = function(key, value, success, error) {
+    exec(success, error, "FirebasePlugin", "setUserProperty", [key, value]);
+};
+
 exports.activateFetched = function (success, error) {
     exec(success, error, "FirebasePlugin", "activateFetched", []);
 };

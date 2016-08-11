@@ -11,24 +11,24 @@
 
 - (void)pluginInitialize {
     NSLog(@"Starting Firebase plugin");
-    
+
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(applicationDidFinishLaunching:)
                                                  name:UIApplicationDidFinishLaunchingNotification object:nil];
-    
+
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tokenRefreshNotification:)
                                                  name:kFIRInstanceIDTokenRefreshNotification object:nil];
-    
+
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(applicationDidBecomeActive:)
                                                  name:UIApplicationDidBecomeActiveNotification object:nil];
-    
+
     [[NSNotificationCenter defaultCenter] addObserver:self
                                              selector:@selector(applicationDidEnterBackground:)
                                                  name:UIApplicationDidEnterBackgroundNotification object:nil];
 }
 
-- (void) applicationDidFinishLaunching:(NSNotification *) notification {    
+- (void) applicationDidFinishLaunching:(NSNotification *) notification {
     [[UIApplication sharedApplication] registerForRemoteNotifications];
 
     [FIRApp configure];
@@ -89,18 +89,18 @@
 
 - (void)subscribe:(CDVInvokedUrlCommand *)command {
     NSString* topic = [NSString stringWithFormat:@"/topics/%@", [command.arguments objectAtIndex:0]];
-    
+
     [[FIRMessaging messaging] subscribeToTopic: topic];
-    
+
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)unsubscribe:(CDVInvokedUrlCommand *)command {
     NSString* topic = [NSString stringWithFormat:@"/topics/%@", [command.arguments objectAtIndex:0]];
-    
+
     [[FIRMessaging messaging] unsubscribeFromTopic: topic];
-    
+
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
@@ -109,9 +109,23 @@
     [self.commandDelegate runInBackground:^{
         NSString* name = [command.arguments objectAtIndex:0];
         NSDictionary* parameters = [command.arguments objectAtIndex:1];
-        
+
+        NSLog(@"FIR Logging Event: %@", name);
         [FIRAnalytics logEventWithName:name parameters:parameters];
-        
+
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
+}
+
+- (void)setUserProperty:(CDVInvokedUrlCommand *)command {
+    [self.commandDelegate runInBackground:^{
+        NSString* name = [command.arguments objectAtIndex:0];
+        NSString* value = [command.arguments objectAtIndex:1];
+
+        NSLog(@"FIR Setting User Property: %@", name);
+        [FIRAnalytics setUserPropertyString:value forName:name];
+
         CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
         [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
@@ -123,10 +137,10 @@
     // should be done.
     NSString *refreshedToken = [[FIRInstanceID instanceID] token];
     NSLog(@"InstanceID token: %@", refreshedToken);
-    
+
     // Connect to FCM since connection may have failed when attempted before having a token.
     [self connectToFcm];
-    
+
     // TODO: If necessary send token to appliation server.
 }
 

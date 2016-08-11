@@ -79,6 +79,9 @@ public class FirebasePlugin extends CordovaPlugin {
         } else if (action.equals("logEvent")) {
             this.logEvent(callbackContext, args.getString(0), args.getJSONObject(1));
             return true;
+        }  else if (action.equals("setUserProperty")) {
+            this.setUserProperty(callbackContext, args.getString(0), args.getString(1));
+            return true;
         } else if (action.equals("activateFetched")) {
             this.activateFetched(callbackContext);
             return true;
@@ -223,6 +226,19 @@ public class FirebasePlugin extends CordovaPlugin {
             public void run() {
                 try {
                     mFirebaseAnalytics.logEvent(name, bundle);
+                    callbackContext.success();
+                } catch (Exception e) {
+                    callbackContext.error(e.getMessage());
+                }
+            }
+        });
+    }
+
+    private void setUserProperty(final CallbackContext callbackContext, final String key, final String value) {
+        cordova.getThreadPool().execute(new Runnable() {
+            public void run() {
+                try {
+                    mFirebaseAnalytics.setUserProperty(key, value);
                     callbackContext.success();
                 } catch (Exception e) {
                     callbackContext.error(e.getMessage());
