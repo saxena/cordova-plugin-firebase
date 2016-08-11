@@ -60,7 +60,7 @@ xmlns:android="http://schemas.android.com/apk/res/android">
 			</feature>
 		</config-file>
 
-    <config-file target="*-Info.plist" parent="/plist/dict">
+    <config-file target="*-Info.plist">
       <key>FirebaseAppDelegateProxyEnabled</key><true/>
     </config-file>
 
