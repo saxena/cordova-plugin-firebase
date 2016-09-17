@@ -48,7 +48,8 @@ xmlns:android="http://schemas.android.com/apk/res/android">
 		<framework src="src/android/build.gradle" custom="true" type="gradleReference" />
 		<framework src="com.google.firebase:firebase-core:9.4.0" />
 		<framework src="com.google.firebase:firebase-messaging:9.4.0" />
-		<framework src="com.google.firebase:firebase-crash:9.4.0" />
+		<!-- Removed because it causes crashes in API version 19.  -->
+		<!-- <framework src="com.google.firebase:firebase-crash:9.4.0" /> -->
 		<framework src="com.google.firebase:firebase-config:9.4.0" />
 	</platform>
 
