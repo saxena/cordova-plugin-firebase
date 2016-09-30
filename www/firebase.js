@@ -8,6 +8,10 @@ exports.onNotificationOpen = function(success, error) {
     exec(success, error, "FirebasePlugin", "onNotificationOpen", []);
 };
 
+exports.onTokenRefreshNotification = function(success, error) {
+    exec(success, error, "FirebasePlugin", "onTokenRefreshNotification", []);
+};
+
 exports.grantPermission = function(success, error) {
     exec(success, error, "FirebasePlugin", "grantPermission", []);
 };
@@ -34,6 +38,14 @@ exports.logEvent = function(name, params, success, error) {
 
 exports.setUserProperty = function(key, value, success, error) {
     exec(success, error, "FirebasePlugin", "setUserProperty", [key, value]);
+};
+
+exports.setUserId = function(id, success, error) {
+    exec(success, error, "FirebasePlugin", "setUserId", [id]);
+};
+
+exports.setUserProperty = function(name, value, success, error) {
+    exec(success, error, "FirebasePlugin", "setUserProperty", [name, value]);
 };
 
 exports.activateFetched = function (success, error) {

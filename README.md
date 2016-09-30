@@ -1,18 +1,16 @@
 # cordova-plugin-firebase
 Cordova plugin for Google Firebase
 
-This plugin is under development! The primary goal for this plugin is to implement Analytics and FCM for cross platform push notifications. Other parts of the SDK will follow later.
-
 ## Installation
 See npm package for versions - https://www.npmjs.com/package/cordova-plugin-firebase
 
 Install the plugin by adding it your project's config.xml:
 ```
-<plugin name="cordova-plugin-firebase" spec="0.1.9" />
+<plugin name="cordova-plugin-firebase" spec="0.1.12" />
 ```
 or by running:
 ```
-cordova plugin add cordova-plugin-firebase --save
+cordova plugin add cordova-plugin-firebase@0.1.12 --save
 ```
 Download your Firebase configuration files, GoogleService-Info.plist for ios and google-services.json for android, and place them in the root folder of your cordova project:
 
@@ -29,7 +27,13 @@ Download your Firebase configuration files, GoogleService-Info.plist for ios and
 
 See https://support.google.com/firebase/answer/7015592 for details how to download the files from firebase.
 
-Whenever cordova prepare is triggered the configuration files are copied to the right place in the ios and android app.
+This plugin uses a hook (after prepare) that copies the configuration files to the right place, namely platforms/ios/\<My Project\>/Resources for ios and platforms/android for android.
+
+**Note that the Firebase SDK requires the configuration files to be present and valid, otherwise your app will crash on boot or Firebase features won't work.**
+
+### Notes about PhoneGap Build
+
+Hooks does not work with PhoneGap Build. This means you will have to manually make sure the configuration files are included. One way to do that is to make a private fork of this plugin and replace the placeholder config files (see src/ios and src/android) with your actual ones.
 
 
 ## Methods
@@ -45,17 +49,26 @@ window.FirebasePlugin.getInstanceId(function(token) {
     console.error(error);
 });
 ```
+Note that token will be null if it has not been established yet
 
-### onNotificationOpen (Android only)
+### onNotificationOpen
 
-Register notification callback: 
+Register notification callback:
 ```
-window.FirebasePlugin.onNotificationOpen(function(success) {
-    console.error(success);
+window.FirebasePlugin.onNotificationOpen(function(notification) {
+    console.error(notification);
 }, function(error) {
     console.error(error);
 });
 ```
+Notification flow:
+
+1. App is in foreground:
+    1. User receives the notification data in the JavaScript callback without any notification on the device itself (this is the normal behaviour of push notifications, it is up to you, the developer, to notify the user)
+2. App is in background:
+    1. User receives the notification message in its device notification bar
+    2. User taps the notification and the app opens
+    3. User receives the notification data in the JavaScript callback
 
 ### grantPermission (iOS only)
 
@@ -106,6 +119,20 @@ Log an event using Analytics:
 window.FirebasePlugin.logEvent("page_view", {page: "dashboard"});
 ```
 
+### setUserId
+
+Set a user id for use in Analytics:
+```
+window.FirebasePlugin.setUserId("user_id");
+```
+
+### setUserProperty
+
+Set a user property for use in Analytics:
+```
+window.FirebasePlugin.setUserProperty("name", "value");
+```
+
 ### fetch (Android only)
 
 Fetch Remote Config parameter values for your app:
@@ -146,7 +173,7 @@ window.FirebasePlugin.getValue("key", "namespace", function(value) {
 ```
 
 ### getByteArray (Android only)
-
+**NOTE: byte array is only available for SDK 19+**
 Retrieve a Remote Config byte array:
 ```
 window.FirebasePlugin.getByteArray("key", function(bytes) {

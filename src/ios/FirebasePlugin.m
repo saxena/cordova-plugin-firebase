@@ -6,71 +6,75 @@
 @import FirebaseMessaging;
 @import FirebaseAnalytics;
 
+#if defined(__IPHONE_10_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
+@import UserNotifications;
+#endif
 
 @implementation FirebasePlugin
 
 @synthesize notificationCallbackId;
+@synthesize tokenRefreshCallbackId;
+@synthesize notificationStack;
+
+static NSInteger const kNotificationStackSize = 10;
+static FirebasePlugin *firebasePlugin;
+
++ (FirebasePlugin *) firebasePlugin {
+    return firebasePlugin;
+}
 
 - (void)pluginInitialize {
     NSLog(@"Starting Firebase plugin");
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(applicationDidFinishLaunching:)
-                                                 name:UIApplicationDidFinishLaunchingNotification object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(tokenRefreshNotification:)
-                                                 name:kFIRInstanceIDTokenRefreshNotification object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(applicationDidBecomeActive:)
-                                                 name:UIApplicationDidBecomeActiveNotification object:nil];
-
-    [[NSNotificationCenter defaultCenter] addObserver:self
-                                             selector:@selector(applicationDidEnterBackground:)
-                                                 name:UIApplicationDidEnterBackgroundNotification object:nil];
-}
-
-- (void) applicationDidFinishLaunching:(NSNotification *) notification {
-    [[UIApplication sharedApplication] registerForRemoteNotifications];
-
-    [FIRApp configure];
-}
-
-- (void)applicationDidBecomeActive:(NSNotification *)application {
-    [self connectToFcm];
-}
-
-- (void)applicationDidEnterBackground:(NSNotification *)application {
-    [[FIRMessaging messaging] disconnect];
-    NSLog(@"Disconnected from FCM");
+    firebasePlugin = self;
 }
 
 - (void)getInstanceId:(CDVInvokedUrlCommand *)command {
     CDVPluginResult *pluginResult;
 
-    if ([[FIRInstanceID instanceID] token]) {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:
-                        [[FIRInstanceID instanceID] token]];
-    } else {
-        pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_ERROR messageAsString:
-                        @"FCM is not connected, or token is not yet available."];
-    }
+    pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:
+                    [[FIRInstanceID instanceID] token]];
+
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)grantPermission:(CDVInvokedUrlCommand *)command {
-    UIUserNotificationType allNotificationTypes =
-    (UIUserNotificationTypeSound | UIUserNotificationTypeAlert | UIUserNotificationTypeBadge);
-    UIUserNotificationSettings *settings =
-    [UIUserNotificationSettings settingsForTypes:allNotificationTypes categories:nil];
-    [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
+#if defined(__IPHONE_10_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_10_0
+    UNAuthorizationOptions authOptions =
+      UNAuthorizationOptionAlert
+      | UNAuthorizationOptionSound
+      | UNAuthorizationOptionBadge;
+    [[UNUserNotificationCenter currentNotificationCenter]
+      requestAuthorizationWithOptions:authOptions
+      completionHandler:^(BOOL granted, NSError * _Nullable error) {
+      }
+    ];
+    [[UNUserNotificationCenter currentNotificationCenter] setDelegate:self];
+# elif defined(__IPHONE_8_0) && __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_8_0
+    if ([[UIApplication sharedApplication]respondsToSelector:@selector(registerUserNotificationSettings:)]) {
+        UIUserNotificationType notificationTypes =
+        (UIUserNotificationTypeSound | UIUserNotificationTypeAlert | UIUserNotificationTypeBadge);
+        UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:notificationTypes categories:nil];
+        [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
+        [[UIApplication sharedApplication] registerForRemoteNotifications];
+    } else {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+        [[UIApplication sharedApplication] registerForRemoteNotificationTypes:(UIRemoteNotificationTypeAlert | UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound)];
+#pragma GCC diagnostic pop
+    }
+#else
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+    [[UIApplication sharedApplication] registerForRemoteNotificationTypes:(UIRemoteNotificationTypeAlert | UIRemoteNotificationTypeBadge | UIRemoteNotificationTypeSound)];
+#pragma GCC diagnostic pop
+#endif
 
     CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
 - (void)setBadgeNumber:(CDVInvokedUrlCommand *)command {
-    int number    = [[command.arguments objectAtIndex:0] intValue];
+    int number = [[command.arguments objectAtIndex:0] intValue];
 
     [self.commandDelegate runInBackground:^{
         [[UIApplication sharedApplication] setApplicationIconBadgeNumber:number];
@@ -107,6 +111,51 @@
     [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
 }
 
+- (void)onNotificationOpen:(CDVInvokedUrlCommand *)command {
+    self.notificationCallbackId = command.callbackId;
+
+    if (self.notificationStack != nil && [self.notificationStack count]) {
+        for (NSDictionary *userInfo in self.notificationStack) {
+            [self sendNotification:userInfo];
+        }
+        [self.notificationStack removeAllObjects];
+    }
+}
+
+- (void)onTokenRefreshNotification:(CDVInvokedUrlCommand *)command {
+    self.tokenRefreshCallbackId = command.callbackId;
+    NSString* currentToken = [[FIRInstanceID instanceID] token];
+    if (currentToken != nil) {
+        [self tokenRefreshNotification:currentToken];
+    }
+}
+
+- (void)sendNotification:(NSDictionary *)userInfo {
+    if (self.notificationCallbackId != nil) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:userInfo];
+        [pluginResult setKeepCallbackAsBool:YES];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.notificationCallbackId];
+    } else {
+        if (!self.notificationStack) {
+            self.notificationStack = [[NSMutableArray alloc] init];
+        }
+
+        // stack notifications until a callback has been registered
+        [self.notificationStack addObject:userInfo];
+
+        if ([self.notificationStack count] >= kNotificationStackSize) {
+            [self.notificationStack removeLastObject];
+        }
+    }
+}
+
+- (void)tokenRefreshNotification:(NSString *)token {
+    if (self.tokenRefreshCallbackId != nil) {
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsString:token];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.tokenRefreshCallbackId];
+    }
+}
+
 - (void)logEvent:(CDVInvokedUrlCommand *)command {
     [self.commandDelegate runInBackground:^{
         NSString* name = [command.arguments objectAtIndex:0];
@@ -133,47 +182,27 @@
     }];
 }
 
-- (void)tokenRefreshNotification:(NSNotification *)notification {
-    // Note that this callback will be fired everytime a new token is generated, including the first
-    // time. So if you need to retrieve the token as soon as it is available this is where that
-    // should be done.
-    NSString *refreshedToken = [[FIRInstanceID instanceID] token];
-    NSLog(@"InstanceID token: %@", refreshedToken);
+- (void)setUserId:(CDVInvokedUrlCommand *)command {
+    [self.commandDelegate runInBackground:^{
+        NSString* id = [command.arguments objectAtIndex:0];
 
-    // Connect to FCM since connection may have failed when attempted before having a token.
-    [self connectToFcm];
+        [FIRAnalytics setUserID:id];
 
-    // TODO: If necessary send token to appliation server.
-}
-
-- (void)connectToFcm {
-    [[FIRMessaging messaging] connectWithCompletion:^(NSError * _Nullable error) {
-        if (error != nil) {
-            NSLog(@"Unable to connect to FCM. %@", error);
-        } else {
-            NSLog(@"Connected to FCM.");
-        }
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
     }];
 }
 
-- (void)onNotificationOpen:(CDVInvokedUrlCommand *)command {
-    self.notificationCallbackId = command.callbackId;
-}
+- (void)setUserProperty:(CDVInvokedUrlCommand *)command {
+    [self.commandDelegate runInBackground:^{
+        NSString* name = [command.arguments objectAtIndex:0];
+        NSString* value = [command.arguments objectAtIndex:1];
 
-- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo
-    fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
+        [FIRAnalytics setUserPropertyString:value forName:name];
 
-    // Print message ID.
-    NSLog(@"Message ID: %@", userInfo[@"gcm.message_id"]);
-
-    // Pring full message.
-    NSLog(@"%@", userInfo);
-
-    if (self.notificationCallbackId != nil) {
-        CDVPluginResult* pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK messageAsDictionary:userInfo];
-        [pluginResult setKeepCallbackAsBool:YES];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:self.notificationCallbackId];
-    }
+        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+    }];
 }
 
 @end
