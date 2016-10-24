@@ -193,16 +193,4 @@ static FirebasePlugin *firebasePlugin;
     }];
 }
 
-- (void)setUserProperty:(CDVInvokedUrlCommand *)command {
-    [self.commandDelegate runInBackground:^{
-        NSString* name = [command.arguments objectAtIndex:0];
-        NSString* value = [command.arguments objectAtIndex:1];
-
-        [FIRAnalytics setUserPropertyString:value forName:name];
-
-        CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
-        [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
-    }];
-}
-
 @end
