@@ -19,6 +19,9 @@
 static NSInteger const kNotificationStackSize = 10;
 static FirebasePlugin *firebasePlugin;
 
+/* XHR Session */
+NSURLSession *sessionWithoutADelegate;
+
 + (FirebasePlugin *) firebasePlugin {
     return firebasePlugin;
 }
@@ -26,6 +29,16 @@ static FirebasePlugin *firebasePlugin;
 - (void)pluginInitialize {
     NSLog(@"Starting Firebase plugin");
     firebasePlugin = self;
+    
+    /* XHR Session */
+    NSString *cachesDirectory = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *cachePath = [cachesDirectory stringByAppendingPathComponent:@"MyXHRCache"];
+    NSURLCache *cache = [[NSURLCache alloc] initWithMemoryCapacity:16384 diskCapacity:268435456 diskPath:cachePath];
+    NSURLSessionConfiguration *defaultConfiguration = [NSURLSessionConfiguration defaultSessionConfiguration];
+    defaultConfiguration.URLCache = cache;
+    defaultConfiguration.requestCachePolicy = NSURLRequestUseProtocolCachePolicy;
+    sessionWithoutADelegate = [NSURLSession sessionWithConfiguration:defaultConfiguration];
+    
 }
 
 - (void)getInstanceId:(CDVInvokedUrlCommand *)command {
@@ -195,10 +208,26 @@ static FirebasePlugin *firebasePlugin;
 
 - (void)fetchXHR:(CDVInvokedUrlCommand *)command {
     [self.commandDelegate runInBackground:^{
-            NSString* url = [command.arguments objectAtIndex:0];
-
+            NSString* urlString = [command.arguments objectAtIndex:0];
+            NSURL *url = [NSURL URLWithString:urlString];
+        
             //[FIRAnalytics setUserID:id];
 
+            for (NSHTTPCookie *cookie in [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies]) {
+                NSLog(@"Before Cookie %@=%@ Domain %@", cookie.name, cookie.value, cookie.domain);
+            }
+        
+            [[sessionWithoutADelegate dataTaskWithURL:url
+                                    completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
+                                        NSLog(@"Got response %@ with error %@.\n", response, error);
+                                        NSLog(@"DATA:\n%@\nEND DATA\n", [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding]);
+                                        
+                                        for (NSHTTPCookie *cookie in [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies]) {
+                                            NSLog(@"After Cookie %@=%@ Domain %@", cookie.name, cookie.value, cookie.domain);
+                                        }
+
+                  }] resume];
+        
             CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
             [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
         }];
