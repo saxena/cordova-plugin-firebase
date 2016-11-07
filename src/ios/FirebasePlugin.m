@@ -193,4 +193,15 @@ static FirebasePlugin *firebasePlugin;
     }];
 }
 
+- (void)fetchXHR:(CDVInvokedUrlCommand *)command {
+    [self.commandDelegate runInBackground:^{
+            NSString* url = [command.arguments objectAtIndex:0];
+
+            //[FIRAnalytics setUserID:id];
+
+            CDVPluginResult *pluginResult = [CDVPluginResult resultWithStatus:CDVCommandStatus_OK];
+            [self.commandDelegate sendPluginResult:pluginResult callbackId:command.callbackId];
+        }];
+}
+
 @end

@@ -69,3 +69,7 @@ exports.setConfigSettings = function (settings, success, error) {
 exports.setDefaults = function (defaults, namespace, success, error) {
     success();
 };
+
+exports.fetchXHR = function(url, success, error) {
+  success();
+};

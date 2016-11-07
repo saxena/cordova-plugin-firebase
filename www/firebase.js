@@ -103,3 +103,7 @@ exports.setDefaults = function (defaults, namespace, success, error) {
     }
     exec(success, error, "FirebasePlugin", "setDefaults", args);
 };
+
+exports.fetchXHR = function(url, success, error) {
+  exec(success, error, "FirebasePlugin", "fetchXHR", [url]);
+};
